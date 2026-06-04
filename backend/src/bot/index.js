@@ -4,6 +4,8 @@ const { handleRegistration, DAYS, buildDaysKeyboard } = require('./handlers/regi
 const { handleCommands } = require('./handlers/commands');
 const { handleExercise } = require('./handlers/exerciseHandler');
 const { handleFood } = require('./handlers/foodHandler');
+const { handleAI, clearHistory } = require('./handlers/aiHandler');
+const { startCron } = require('./cron');
 const userState = require('./state');
 
 let bot;
@@ -33,8 +35,11 @@ function startBot() {
     }
 
     if (user.isRegistered) {
+      clearHistory(tgUser.id);
       return ctx.reply(
-        `Вітаємо, ${tgUser.first_name}! Ви вже зареєстровані.\nВикористовуйте /help для списку команд.`
+        `Вітаємо, ${tgUser.first_name}! Ви вже зареєстровані.\n\n` +
+        `Просто напишіть мені що ви їли або яке тренування зробили — я все підрахую і запишу.\n\n` +
+        `Використовуйте /help для списку команд.`
       );
     }
 
@@ -43,7 +48,7 @@ function startBot() {
     );
   });
 
-  // Inline keyboard callbacks (training days selection)
+  // Inline keyboard callbacks (training days selection during registration)
   bot.on('callback_query', async (ctx) => {
     const tgUser = ctx.from;
     const data = ctx.callbackQuery.data;
@@ -78,11 +83,9 @@ function startBot() {
     if (!DAYS.includes(day)) return ctx.answerCbQuery();
 
     const idx = selectedDays.indexOf(day);
-    if (idx === -1) {
-      selectedDays.push(day);
-    } else {
-      selectedDays.splice(idx, 1);
-    }
+    if (idx === -1) selectedDays.push(day);
+    else selectedDays.splice(idx, 1);
+
     userState.set(tgUser.id, 'training_days_select', { selectedDays });
 
     try {
@@ -96,25 +99,29 @@ function startBot() {
     const tgUser = ctx.from;
     const user = await User.findOne({ telegramId: tgUser.id });
 
-    if (!user) {
-      return ctx.reply('Введіть /start для початку роботи.');
-    }
-    if (user.isBlocked) {
-      return ctx.reply('Ваш акаунт заблоковано. Зверніться до адміністратора.');
-    }
-    if (!user.isRegistered) {
-      return handleRegistration(ctx, user);
-    }
+    if (!user) return ctx.reply('Введіть /start для початку роботи.');
+    if (user.isBlocked) return ctx.reply('Ваш акаунт заблоковано. Зверніться до адміністратора.');
+
+    // Registration flow
+    if (!user.isRegistered) return handleRegistration(ctx, user);
 
     const text = ctx.message.text;
+
+    // Mid-flow state handlers (for /log_exercise and /log_food command flows)
     if (await handleExercise(ctx, user, text)) return;
     if (await handleFood(ctx, user, text)) return;
 
-    return handleCommands(ctx, user);
+    // Slash commands (/help, /profile — not handled above)
+    if (text.startsWith('/')) return handleCommands(ctx, user);
+
+    // AI handles all free-form messages
+    return handleAI(ctx, user);
   });
 
   bot.launch();
   console.log('Telegram bot started');
+
+  startCron(bot);
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
