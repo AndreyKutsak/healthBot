@@ -1,6 +1,14 @@
 const cron = require('node-cron');
 const User = require('../models/User');
 const Exercise = require('../models/Exercise');
+const ScheduledTask = require('../models/ScheduledTask');
+
+const CATEGORY_EMOJI = {
+  nutrition: '🍽',
+  training: '💪',
+  praise: '🎉',
+  reminder: '🔔',
+};
 
 const GOAL_LABEL = {
   weight_loss: 'схуднення',
@@ -115,6 +123,51 @@ function startCron(bot) {
               `💪 *Сьогодні день тренування!*\n\nВид спорту: ${user.sport}\nЧас: ${time}${exerciseList}\n\nПісля тренування розкажіть мені про вправи — все запишу і підіб'ю підсумок! 🏋️`,
               { parse_mode: 'Markdown' },
             );
+          }
+        }
+      }
+
+      // --- Dynamic one-time tasks (due now or overdue) ---
+      const dueTasks = await ScheduledTask.find({
+        type: 'one-time',
+        sent: false,
+        active: true,
+        scheduledAt: { $lte: new Date() },
+      });
+
+      for (const task of dueTasks) {
+        await ScheduledTask.updateOne({ _id: task._id }, { sent: true });
+        const emoji = CATEGORY_EMOJI[task.category] || '🔔';
+        try {
+          await bot.telegram.sendMessage(
+            task.telegramId,
+            `${emoji} ${task.message}`,
+          );
+        } catch (sendErr) {
+          console.error(`[cron] failed to send task ${task._id}:`, sendErr.message);
+        }
+      }
+
+      // --- Dynamic recurring tasks ---
+      const recurringTasks = await ScheduledTask.find({
+        type: 'recurring',
+        active: true,
+        recurTime: time,
+        recurDays: day,
+      });
+
+      for (const task of recurringTasks) {
+        const key = `dynamic_${task._id}_${today}`;
+        if (!sentToday.has(key)) {
+          sentToday.add(key);
+          const emoji = CATEGORY_EMOJI[task.category] || '🔔';
+          try {
+            await bot.telegram.sendMessage(
+              task.telegramId,
+              `${emoji} ${task.message}`,
+            );
+          } catch (sendErr) {
+            console.error(`[cron] failed to send recurring task ${task._id}:`, sendErr.message);
           }
         }
       }
