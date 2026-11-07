@@ -4,3 +4,8 @@ dist/
 .DS_Store
 backend/whisper/bin/
 backend/whisper/models/
+
+# Versioned static EMBER design prototype
+!prototype-v1/dist/
+!prototype-v1/dist/**
+prototype-v1/.openai/
