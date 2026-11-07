@@ -10,6 +10,7 @@ const exerciseRoutes = require("./routes/exercises");
 const exerciseHistoryRoutes = require("./routes/exerciseHistory");
 const foodRoutes = require("./routes/food");
 const foodHistoryRoutes = require("./routes/foodHistory");
+const meRoutes = require("./routes/me");
 const { startBot } = require("./bot");
 
 const app = express();
@@ -23,6 +24,10 @@ app.use("/api/exercises", exerciseRoutes);
 app.use("/api/exercise-history", exerciseHistoryRoutes);
 app.use("/api/food", foodRoutes);
 app.use("/api/food-history", foodHistoryRoutes);
+app.use("/api/me", meRoutes);
+
+// EMBER web app (Telegram Mini App) — static files of the prototype
+app.use(express.static(require("path").join(__dirname, "..", "..", "prototype-v1", "dist")));
 
 mongoose
   .connect(process.env.MONGODB_URI)

@@ -25,6 +25,16 @@ npm run dev
 Адмін-панель: http://localhost:3000  
 Логін: `admin` / `admin123`
 
+### 4. Вебзастосунок EMBER (Telegram Mini App)
+Бекенд роздає прототип `prototype-v1/dist` за адресою `/`, дані бере з `/api/me`.
+Користувач визначається за підписаними даними Telegram (`initData`), окремого входу немає.
+
+- **Локально без Telegram:** у `backend/.env` вкажіть `DEV_TELEGRAM_ID=<ваш telegramId>`
+  (користувач має пройти реєстрацію в боті) і відкрийте http://localhost:5000
+- **У Telegram:** потрібна публічна https-адреса бекенду (сервер або тунель,
+  наприклад `cloudflared tunnel --url http://localhost:5000`). Вкажіть її у `WEBAPP_URL`
+  і перезапустіть бекенд — у бота з’явиться кнопка меню «Мій день».
+
 ## Структура
 
 ```

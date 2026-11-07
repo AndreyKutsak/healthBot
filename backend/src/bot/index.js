@@ -142,6 +142,16 @@ function startBot() {
   bot.launch();
   console.log('Telegram bot started');
 
+  // Menu button that opens the EMBER web app (Telegram requires an https URL)
+  if (process.env.WEBAPP_URL) {
+    bot.telegram
+      .setChatMenuButton({
+        menuButton: { type: 'web_app', text: 'Мій день', web_app: { url: process.env.WEBAPP_URL } },
+      })
+      .then(() => console.log(`Web app menu button: ${process.env.WEBAPP_URL}`))
+      .catch((err) => console.error('Web app menu button error:', err.message));
+  }
+
   startCron(bot);
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
