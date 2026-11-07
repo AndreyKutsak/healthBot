@@ -6,6 +6,7 @@ const FoodHistory = require('../models/FoodHistory');
 const ExerciseHistory = require('../models/ExerciseHistory');
 const TrainingPlan = require('../models/TrainingPlan');
 const adminAuth = require('../middleware/adminAuth');
+const { EATEN } = require('../utils/nutrition');
 
 // All routes require admin auth
 router.use(adminAuth);
@@ -88,9 +89,9 @@ router.get('/:id/calorie-stats', async (req, res) => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [fToday, fWeek, fMonth, eToday, eWeek, eMonth] = await Promise.all([
-      FoodHistory.aggregate([{ $match: { userId: uid, date: { $gte: todayStart } } }, { $group: { _id: null, t: { $sum: '$calories' } } }]),
-      FoodHistory.aggregate([{ $match: { userId: uid, date: { $gte: weekStart } } }, { $group: { _id: null, t: { $sum: '$calories' } } }]),
-      FoodHistory.aggregate([{ $match: { userId: uid, date: { $gte: monthStart } } }, { $group: { _id: null, t: { $sum: '$calories' } } }]),
+      FoodHistory.aggregate([{ $match: { userId: uid, date: { $gte: todayStart }, ...EATEN } }, { $group: { _id: null, t: { $sum: '$calories' } } }]),
+      FoodHistory.aggregate([{ $match: { userId: uid, date: { $gte: weekStart }, ...EATEN } }, { $group: { _id: null, t: { $sum: '$calories' } } }]),
+      FoodHistory.aggregate([{ $match: { userId: uid, date: { $gte: monthStart }, ...EATEN } }, { $group: { _id: null, t: { $sum: '$calories' } } }]),
       ExerciseHistory.aggregate([{ $match: { userId: uid, date: { $gte: todayStart } } }, { $group: { _id: null, t: { $sum: '$caloriesBurned' } } }]),
       ExerciseHistory.aggregate([{ $match: { userId: uid, date: { $gte: weekStart } } }, { $group: { _id: null, t: { $sum: '$caloriesBurned' } } }]),
       ExerciseHistory.aggregate([{ $match: { userId: uid, date: { $gte: monthStart } } }, { $group: { _id: null, t: { $sum: '$caloriesBurned' } } }]),

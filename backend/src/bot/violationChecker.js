@@ -108,7 +108,7 @@ async function checkDailyViolations(bot) {
 
     // Diet violation: food was logged today and exceeded 120% of daily limit
     if (user.dailyCalories) {
-      const foodLogs = await FoodHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow } });
+      const foodLogs = await FoodHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow }, status: { $ne: 'planned' } });
       const totalCalories = foodLogs.reduce((s, l) => s + (l.calories || 0), 0);
       if (totalCalories > 0 && totalCalories > user.dailyCalories * 1.2) {
         const already = await Violation.findOne({ userId: user._id, type: 'diet_violation', date: { $gte: today } });

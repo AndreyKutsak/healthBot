@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const FoodHistory = require('../models/FoodHistory');
 const adminAuth = require('../middleware/adminAuth');
+const { snapshotFor } = require('../utils/nutrition');
 
 router.use(adminAuth);
 
@@ -40,8 +41,8 @@ router.post('/', async (req, res) => {
     const food = await Food.findById(foodId);
     if (!food) return res.status(404).json({ message: 'Food not found' });
 
-    const calories = Math.round((food.caloriesPer100g * amountG) / 100);
-    const record = await FoodHistory.create({ userId, foodId, amountG, calories, mealType, notes, date });
+    const snapshot = snapshotFor(food, amountG);
+    const record = await FoodHistory.create({ ...snapshot, userId, foodId, amountG, mealType, notes, date });
     const populated = await record.populate([
       { path: 'userId', select: 'firstName lastName username' },
       { path: 'foodId', select: 'name category caloriesPer100g' },
@@ -67,7 +68,7 @@ router.patch('/:id', async (req, res) => {
         ? await Food.findById(updates.foodId)
         : existing.foodId;
       const amount = updates.amountG ?? existing.amountG;
-      if (foodDoc) updates.calories = Math.round((foodDoc.caloriesPer100g * amount) / 100);
+      if (foodDoc && amount) Object.assign(updates, snapshotFor(foodDoc, amount));
     }
 
     const record = await FoodHistory.findByIdAndUpdate(req.params.id, updates, { new: true })

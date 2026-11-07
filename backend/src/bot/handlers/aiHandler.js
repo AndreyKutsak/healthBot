@@ -10,6 +10,7 @@ const User = require('../../models/User');
 const botRef = require('../botRef');
 const { logViolationAndWarn } = require('../violationChecker');
 const { calculateKBJU, DIET_LABEL } = require('./registration');
+const { EATEN, sumNutrition, entryName, snapshotFor } = require('../../utils/nutrition');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -341,6 +342,7 @@ async function processTool(name, input, user) {
       (m) => m.toLowerCase() === (input.meal_type || '').toLowerCase().trim()
     ) || 'Сніданок';
     await FoodHistory.create({
+      ...snapshotFor(food, input.amount_grams),
       userId: user._id,
       foodId: food._id,
       amountG: input.amount_grams,
@@ -417,23 +419,15 @@ async function processTool(name, input, user) {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [foodLogs, exerciseLogs] = await Promise.all([
-      FoodHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow } }).populate('foodId'),
+      FoodHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow }, ...EATEN }).populate('foodId'),
       ExerciseHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow } }).populate('exerciseId'),
     ]);
 
-    const totalCalories = foodLogs.reduce((s, l) => s + (l.calories || 0), 0);
-    const totalProtein = foodLogs.reduce((s, l) => {
-      if (!l.foodId) return s;
-      return s + Math.round((l.foodId.proteinPer100g * l.amountG) / 100);
-    }, 0);
-    const totalCarbs = foodLogs.reduce((s, l) => {
-      if (!l.foodId) return s;
-      return s + Math.round((l.foodId.carbsPer100g * l.amountG) / 100);
-    }, 0);
-    const totalFat = foodLogs.reduce((s, l) => {
-      if (!l.foodId) return s;
-      return s + Math.round((l.foodId.fatPer100g * l.amountG) / 100);
-    }, 0);
+    const totals = sumNutrition(foodLogs);
+    const totalCalories = totals.calories;
+    const totalProtein = totals.protein;
+    const totalCarbs = totals.carbs;
+    const totalFat = totals.fat;
 
     const totalBurned = exerciseLogs.reduce((s, l) => s + (l.caloriesBurned || 0), 0);
 
@@ -450,7 +444,7 @@ async function processTool(name, input, user) {
       totalBurned,
       netCalories: totalCalories - totalBurned,
       foodEntries: foodLogs.map((l) => ({
-        food: l.foodId ? l.foodId.name : 'Невідомо',
+        food: entryName(l),
         amount: l.amountG,
         calories: l.calories,
         mealType: l.mealType,
@@ -978,4 +972,4 @@ function clearHistory(telegramId) {
   conversations.delete(telegramId);
 }
 
-module.exports = { handleAI, clearHistory };
+module.exports = { handleAI, clearHistory, processTool };

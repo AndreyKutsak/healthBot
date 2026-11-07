@@ -3,6 +3,7 @@ const TrainingPlan = require('../../models/TrainingPlan');
 const FoodHistory = require('../../models/FoodHistory');
 const ExerciseHistory = require('../../models/ExerciseHistory');
 const { MAIN_KEYBOARD } = require('../keyboard');
+const { EATEN, sumNutrition, entryName } = require('../../utils/nutrition');
 
 const GOAL_LABEL = {
   weight_loss: 'Схуднення',
@@ -29,14 +30,11 @@ async function handleDailyStats(ctx, user) {
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
   const [foodLogs, exerciseLogs] = await Promise.all([
-    FoodHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow } }).populate('foodId'),
+    FoodHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow }, ...EATEN }).populate('foodId'),
     ExerciseHistory.find({ userId: user._id, date: { $gte: today, $lt: tomorrow } }).populate('exerciseId'),
   ]);
 
-  const totalCalories = foodLogs.reduce((s, l) => s + (l.calories || 0), 0);
-  const totalProtein  = foodLogs.reduce((s, l) => s + (l.foodId ? Math.round((l.foodId.proteinPer100g * l.amountG) / 100) : 0), 0);
-  const totalCarbs    = foodLogs.reduce((s, l) => s + (l.foodId ? Math.round((l.foodId.carbsPer100g  * l.amountG) / 100) : 0), 0);
-  const totalFat      = foodLogs.reduce((s, l) => s + (l.foodId ? Math.round((l.foodId.fatPer100g    * l.amountG) / 100) : 0), 0);
+  const { calories: totalCalories, protein: totalProtein, carbs: totalCarbs, fat: totalFat } = sumNutrition(foodLogs);
   const totalBurned   = exerciseLogs.reduce((s, l) => s + (l.caloriesBurned || 0), 0);
 
   let msg = `📊 Статистика за ${today.toLocaleDateString('uk-UA')}:\n\n`;
@@ -46,7 +44,7 @@ async function handleDailyStats(ctx, user) {
     msg += `  • Записів ще немає\n`;
   } else {
     for (const l of foodLogs) {
-      msg += `  • ${l.foodId?.name || '—'} — ${l.amountG}г, ${l.calories} ккал (${l.mealType})\n`;
+      msg += `  • ${entryName(l)} — ${l.amountG ? `${l.amountG}г, ` : ''}${l.approx ? '≈' : ''}${l.calories} ккал (${l.mealType})\n`;
     }
   }
   msg += `\n🔥 Калорій: ${totalCalories}`;

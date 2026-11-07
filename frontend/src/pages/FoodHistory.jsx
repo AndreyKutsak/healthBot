@@ -115,7 +115,10 @@ export default function FoodHistory() {
                   <tr key={r._id}>
                     <td>{formatDate(r.date)}</td>
                     <td>{userName(r.userId)}</td>
-                    <td><strong>{r.foodId?.name ?? '—'}</strong></td>
+                    <td>
+                      <strong>{r.foodId?.name ?? r.name ?? '—'}</strong>
+                      {r.status === 'planned' && <span className="badge" style={{ marginLeft: 6 }}>план</span>}
+                    </td>
                     <td>{r.foodId?.category
                       ? <span className="badge active">{r.foodId.category}</span>
                       : '—'}
@@ -123,8 +126,8 @@ export default function FoodHistory() {
                     <td>
                       <span className={`badge ${mealBadgeClass[r.mealType] || 'active'}`}>{r.mealType}</span>
                     </td>
-                    <td>{r.amountG} г</td>
-                    <td><strong style={{ color: 'var(--primary)' }}>{r.calories}</strong> ккал</td>
+                    <td>{r.amountG ? `${r.amountG} г` : '—'}</td>
+                    <td><strong style={{ color: 'var(--primary)' }}>{r.approx ? '≈' : ''}{r.calories}</strong> ккал</td>
                     <td style={{ maxWidth: 140, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{r.notes || '—'}</td>
                     <td style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-outline btn-sm" onClick={() => setModal({ mode: 'edit', data: { ...r, userId: r.userId?._id, foodId: r.foodId?._id } })}>✏️</button>
