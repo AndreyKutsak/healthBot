@@ -24,6 +24,39 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST /api/food/import — bulk upsert from CSV/JSON
+router.post('/import', async (req, res) => {
+  try {
+    const { records } = req.body;
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ message: 'Немає записів для імпорту' });
+    }
+    const ops = records
+      .filter((r) => r.name && String(r.name).trim())
+      .map((r) => ({
+        updateOne: {
+          filter: { name: String(r.name).trim() },
+          update: {
+            $set: {
+              name: String(r.name).trim(),
+              category: r.category || 'Інше',
+              caloriesPer100g: Number(r.caloriesPer100g) || 0,
+              proteinPer100g: Number(r.proteinPer100g) || 0,
+              carbsPer100g: Number(r.carbsPer100g) || 0,
+              fatPer100g: Number(r.fatPer100g) || 0,
+            },
+          },
+          upsert: true,
+        },
+      }));
+    if (!ops.length) return res.status(400).json({ message: 'Немає валідних записів (поле name обов\'язкове)' });
+    const result = await Food.bulkWrite(ops);
+    res.json({ inserted: result.upsertedCount, updated: result.modifiedCount, total: ops.length });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 // POST /api/food
 router.post('/', async (req, res) => {
   try {

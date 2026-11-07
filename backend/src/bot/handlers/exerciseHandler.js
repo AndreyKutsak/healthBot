@@ -1,6 +1,8 @@
 const Exercise = require('../../models/Exercise');
 const ExerciseHistory = require('../../models/ExerciseHistory');
 const stateStore = require('../state');
+const { MAIN_KEYBOARD } = require('../keyboard');
+const { handleAI } = require('./aiHandler');
 
 const CATEGORIES = ['Кардіо', 'Силові', 'Розтяжка', 'Йога', 'Функціональні', 'Інше'];
 const CANCEL = '❌ Скасувати';
@@ -17,13 +19,11 @@ function mkKeyboard(rows) {
   };
 }
 
-const rmKeyboard = { reply_markup: { remove_keyboard: true } };
-
 async function handleExercise(ctx, user, text) {
   const telegramId = user.telegramId;
   const userId = user._id;
 
-  if (text === '/log_exercise') {
+  if (text === '/log_exercise' || text === '🏋️ Тренування') {
     stateStore.set(telegramId, 'exercise_category');
     const rows = [];
     for (let i = 0; i < CATEGORIES.length; i += 3) {
@@ -38,7 +38,13 @@ async function handleExercise(ctx, user, text) {
 
   if (text === CANCEL) {
     stateStore.clear(telegramId);
-    await ctx.reply('Скасовано.', rmKeyboard);
+    await ctx.reply('Скасовано.', MAIN_KEYBOARD);
+    return true;
+  }
+
+  if (st.state === 'exercise_ai_name') {
+    stateStore.clear(telegramId);
+    await handleAI(ctx, user);
     return true;
   }
 
@@ -49,8 +55,11 @@ async function handleExercise(ctx, user, text) {
     }
     const exercises = await Exercise.find({ category: text }).sort({ name: 1 }).limit(20);
     if (!exercises.length) {
-      stateStore.clear(telegramId);
-      await ctx.reply('У цій категорії ще немає вправ. Зверніться до адміністратора.', rmKeyboard);
+      stateStore.set(telegramId, 'exercise_ai_name', { category: text });
+      await ctx.reply(
+        `У категорії "${text}" ще немає вправ у базі.\n\nНапишіть назву вправи — я запишу її автоматично:`,
+        { reply_markup: { keyboard: [[{ text: CANCEL }]], resize_keyboard: true, one_time_keyboard: true } }
+      );
       return true;
     }
     stateStore.set(telegramId, 'exercise_pick', {
@@ -80,15 +89,16 @@ async function handleExercise(ctx, user, text) {
     const effLine = `📊 Ефективність: ${EFFECTIVENESS_EMOJI[eff] || ''} ${eff}`;
     stateStore.set(telegramId, 'exercise_details', { ...st.data, selectedEx: ex });
 
+    const noKb = { reply_markup: { remove_keyboard: true } };
     if (st.data.category === 'Кардіо') {
       await ctx.reply(
         `✅ Вправа: *${ex.name}*\n${effLine}\n\nВведіть тривалість тренування (хвилин), наприклад: *30*`,
-        { parse_mode: 'Markdown', ...rmKeyboard }
+        { parse_mode: 'Markdown', ...noKb }
       );
     } else {
       await ctx.reply(
         `✅ Вправа: *${ex.name}*\n${effLine}\n\nВведіть підходи, повторення та вагу (кг) через пробіл:\nНаприклад: *3 10 70*\n(якщо вага не потрібна — введіть 0)`,
-        { parse_mode: 'Markdown', ...rmKeyboard }
+        { parse_mode: 'Markdown', ...noKb }
       );
     }
     return true;
@@ -123,7 +133,7 @@ async function handleExercise(ctx, user, text) {
     stateStore.clear(telegramId);
     await ctx.reply(`✅ Тренування записано!\n\n🏋️ *${selectedEx.name}*\n${summary}`, {
       parse_mode: 'Markdown',
-      ...rmKeyboard,
+      ...MAIN_KEYBOARD,
     });
     return true;
   }

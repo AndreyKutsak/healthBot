@@ -180,7 +180,8 @@ tr:hover td { background: #f8fafc; }
 .login-card p { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 28px; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; }
-.form-group input {
+.form-group input,
+.form-group textarea {
   width: 100%;
   padding: 9px 12px;
   border: 1px solid var(--border);
@@ -188,8 +189,11 @@ tr:hover td { background: #f8fafc; }
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.15s;
+  font-family: inherit;
+  box-sizing: border-box;
 }
-.form-group input:focus { border-color: var(--primary); }
+.form-group input:focus,
+.form-group textarea:focus { border-color: var(--primary); }
 .error-msg { color: var(--danger); font-size: 0.85rem; margin-bottom: 14px; }
 .login-card .btn { width: 100%; padding: 10px; font-size: 0.95rem; }
 
@@ -212,7 +216,8 @@ tr:hover td { background: #f8fafc; }
 .modal h2 { font-size: 1.1rem; margin-bottom: 20px; }
 .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
 .modal .form-group input,
-.modal .form-group select {
+.modal .form-group select,
+.modal .form-group textarea {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--border);
@@ -221,7 +226,8 @@ tr:hover td { background: #f8fafc; }
   outline: none;
 }
 .modal .form-group input:focus,
-.modal .form-group select:focus { border-color: var(--primary); }
+.modal .form-group select:focus,
+.modal .form-group textarea:focus { border-color: var(--primary); }
 
 /* Empty state */
 .empty { text-align: center; padding: 48px 20px; color: var(--text-muted); font-size: 0.9rem; }

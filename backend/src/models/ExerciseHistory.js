@@ -8,6 +8,7 @@ const exerciseHistorySchema = new mongoose.Schema(
     reps: { type: Number, default: null },
     weightKg: { type: Number, default: null },
     durationMin: { type: Number, default: null },
+    caloriesBurned: { type: Number, default: null },
     notes: { type: String, default: '' },
     date: { type: Date, default: Date.now },
   },

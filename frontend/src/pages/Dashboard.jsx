@@ -41,24 +41,45 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {stats?.sportStats?.length > 0 && (
+        {stats?.goalStats?.length > 0 && (
           <div className="table-card">
             <div className="table-toolbar">
-              <strong style={{ fontSize: '0.9rem' }}>Топ видів спорту</strong>
+              <strong style={{ fontSize: '0.9rem' }}>Розподіл за цілями</strong>
             </div>
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Вид спорту</th>
+                  <th>Ціль</th>
                   <th>Кількість</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.sportStats.map((s, i) => (
+                {stats.goalStats.map((s) => (
                   <tr key={s._id}>
-                    <td>{i + 1}</td>
-                    <td>{s._id}</td>
+                    <td>{{ weight_loss: 'Схуднення', muscle_gain: 'Набір маси', maintenance: 'Підтримка форми' }[s._id] || s._id}</td>
+                    <td>{s.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {stats?.gymStats?.length > 0 && (
+          <div className="table-card" style={{ marginTop: '16px' }}>
+            <div className="table-toolbar">
+              <strong style={{ fontSize: '0.9rem' }}>Спортзал</strong>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Статус</th>
+                  <th>Кількість</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.gymStats.map((s) => (
+                  <tr key={String(s._id)}>
+                    <td>{s._id === true ? 'Ходить у зал' : s._id === false ? 'Не ходить' : 'Не вказано'}</td>
                     <td>{s.count}</td>
                   </tr>
                 ))}

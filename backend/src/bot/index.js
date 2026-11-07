@@ -1,17 +1,21 @@
 const { Telegraf } = require('telegraf');
 const User = require('../models/User');
 const { handleRegistration, DAYS, buildDaysKeyboard } = require('./handlers/registration');
-const { handleCommands } = require('./handlers/commands');
+const { handleCommands, BUTTON_ALIASES } = require('./handlers/commands');
 const { handleExercise } = require('./handlers/exerciseHandler');
 const { handleFood } = require('./handlers/foodHandler');
 const { handleAI, clearHistory } = require('./handlers/aiHandler');
+const { handleVoice } = require('./handlers/voiceHandler');
 const { startCron } = require('./cron');
 const userState = require('./state');
+const botRef = require('./botRef');
+const { MAIN_KEYBOARD } = require('./keyboard');
 
 let bot;
 
 function startBot() {
   bot = new Telegraf(process.env.BOT_TOKEN);
+  botRef.set(bot);
 
   // /start — entry point
   bot.start(async (ctx) => {
@@ -37,9 +41,9 @@ function startBot() {
     if (user.isRegistered) {
       clearHistory(tgUser.id);
       return ctx.reply(
-        `Вітаємо, ${tgUser.first_name}! Ви вже зареєстровані.\n\n` +
-        `Просто напишіть мені що ви їли або яке тренування зробили — я все підрахую і запишу.\n\n` +
-        `Використовуйте /help для списку команд.`
+        `Вітаємо, ${tgUser.first_name}! 👋\n\n` +
+        `Оберіть дію на клавіатурі або просто напишіть що ви їли чи яке тренування зробили — я все підрахую і запишу.`,
+        MAIN_KEYBOARD
       );
     }
 
@@ -56,7 +60,7 @@ function startBot() {
     if (!data || !data.startsWith('td_')) return ctx.answerCbQuery();
 
     const user = await User.findOne({ telegramId: tgUser.id });
-    if (!user || user.isBlocked || user.registrationStep !== 'training_days') {
+    if (!user || user.isBlocked || user.registrationStep !== 'gym_days') {
       return ctx.answerCbQuery();
     }
 
@@ -67,15 +71,24 @@ function startBot() {
 
     if (data === 'td_done') {
       if (selectedDays.length === 0) {
-        return ctx.answerCbQuery('Оберіть хоча б один день тренування!');
+        return ctx.answerCbQuery('Оберіть хоча б один день!');
       }
       userState.clear(tgUser.id);
       await User.updateOne(
         { _id: user._id },
-        { trainingDays: selectedDays, registrationStep: 'training_time' }
+        { trainingDays: selectedDays, registrationStep: 'injuries' }
       );
-      await ctx.editMessageText(`Дні тренувань: ${selectedDays.join(', ')} ✅`);
-      await ctx.reply('Вкажіть час тренувань у форматі ГГ:ХХ (наприклад: 18:00):');
+      await ctx.editMessageText(`Дні в залі: ${selectedDays.join(', ')} ✅`);
+      await ctx.reply(
+        'Чи є у тебе травми або обмеження для тренувань?\n(Напиши "Немає" або опиши свої травми)',
+        {
+          reply_markup: {
+            keyboard: [[{ text: 'Немає' }]],
+            resize_keyboard: true,
+            one_time_keyboard: true,
+          },
+        }
+      );
       return ctx.answerCbQuery();
     }
 
@@ -92,6 +105,14 @@ function startBot() {
       await ctx.editMessageReplyMarkup(buildDaysKeyboard(selectedDays));
     } catch (_) {}
     return ctx.answerCbQuery();
+  });
+
+  // Voice messages → transcribe → AI
+  bot.on('voice', async (ctx) => {
+    const tgUser = ctx.from;
+    const user = await User.findOne({ telegramId: tgUser.id });
+    if (!user || user.isBlocked || !user.isRegistered) return;
+    await handleVoice(ctx, user);
   });
 
   // All text messages
@@ -111,8 +132,8 @@ function startBot() {
     if (await handleExercise(ctx, user, text)) return;
     if (await handleFood(ctx, user, text)) return;
 
-    // Slash commands (/help, /profile — not handled above)
-    if (text.startsWith('/')) return handleCommands(ctx, user);
+    // Slash commands and main-keyboard buttons
+    if (text.startsWith('/') || text in BUTTON_ALIASES) return handleCommands(ctx, user);
 
     // AI handles all free-form messages
     return handleAI(ctx, user);

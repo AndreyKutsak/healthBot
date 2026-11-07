@@ -1,6 +1,8 @@
 const Food = require('../../models/Food');
 const FoodHistory = require('../../models/FoodHistory');
 const stateStore = require('../state');
+const { MAIN_KEYBOARD } = require('../keyboard');
+const { handleAI } = require('./aiHandler');
 
 const MEAL_TYPES = ['Сніданок', 'Обід', 'Вечеря', 'Перекус'];
 const CANCEL = '❌ Скасувати';
@@ -15,15 +17,13 @@ function mkKeyboard(rows) {
   };
 }
 
-const rmKeyboard = { reply_markup: { remove_keyboard: true } };
-
 async function handleFood(ctx, user, text) {
   const telegramId = user.telegramId;
   const userId = user._id;
 
-  if (text === '/log_food') {
+  if (text === '/log_food' || text === '🍎 Їжа') {
     stateStore.set(telegramId, 'food_search');
-    await ctx.reply('🥗 Введіть назву продукту для пошуку:', rmKeyboard);
+    await ctx.reply('🥗 Введіть назву продукту для пошуку:', { reply_markup: { remove_keyboard: true } });
     return true;
   }
 
@@ -32,7 +32,7 @@ async function handleFood(ctx, user, text) {
 
   if (text === CANCEL) {
     stateStore.clear(telegramId);
-    await ctx.reply('Скасовано.', rmKeyboard);
+    await ctx.reply('Скасовано.', MAIN_KEYBOARD);
     return true;
   }
 
@@ -41,7 +41,8 @@ async function handleFood(ctx, user, text) {
       .sort({ name: 1 })
       .limit(8);
     if (!foods.length) {
-      await ctx.reply('Продукт не знайдено. Спробуйте інший запит або зверніться до адміністратора:');
+      stateStore.clear(telegramId);
+      await handleAI(ctx, user);
       return true;
     }
     stateStore.set(telegramId, 'food_pick', {
@@ -70,7 +71,7 @@ async function handleFood(ctx, user, text) {
     stateStore.set(telegramId, 'food_amount', { food });
     await ctx.reply(
       `✅ Продукт: *${food.name}*\n🔥 Калорійність: *${food.caloriesPer100g} ккал* / 100 г\n\nВведіть кількість у грамах (наприклад: *200*):`,
-      { parse_mode: 'Markdown', ...rmKeyboard }
+      { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } }
     );
     return true;
   }
@@ -101,7 +102,7 @@ async function handleFood(ctx, user, text) {
     stateStore.clear(telegramId);
     await ctx.reply(
       `✅ Записано!\n\n🍽 *${food.name}* — ${amountG} г\n🔥 ${calories} ккал\n📌 ${text}`,
-      { parse_mode: 'Markdown', ...rmKeyboard }
+      { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
     );
     return true;
   }

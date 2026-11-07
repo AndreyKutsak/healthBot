@@ -15,6 +15,7 @@ export default function Food() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showImport, setShowImport] = useState(false);
 
   const fetchFoods = useCallback(async () => {
     setLoading(true);
@@ -48,6 +49,9 @@ export default function Food() {
         <h1>Їжа та калорійність</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span className="topbar-user">Всього: {total}</span>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowImport(true)}>
+            ↑ Імпорт
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => setModal({ mode: 'add', data: { ...EMPTY_FORM } })}>
             + Додати продукт
           </button>
@@ -110,6 +114,14 @@ export default function Food() {
         </div>
       </div>
 
+      {showImport && (
+        <ImportModal
+          type="food"
+          onClose={() => setShowImport(false)}
+          onImported={fetchFoods}
+        />
+      )}
+
       {modal && (
         <FoodModal
           mode={modal.mode}
@@ -133,6 +145,124 @@ export default function Food() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n').filter(Boolean);
+  if (lines.length < 2) return { error: 'CSV має містити рядок заголовків та хоча б один запис', data: [] };
+  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"(.*)"$/, '$1'));
+  const data = lines.slice(1).map((line) => {
+    const vals = line.split(',').map((v) => v.trim().replace(/^"(.*)"$/, '$1'));
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+    return obj;
+  });
+  return { error: null, data };
+}
+
+function ImportModal({ type, onClose, onImported }) {
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const FOOD_HEADERS = 'name,category,caloriesPer100g,proteinPer100g,carbsPer100g,fatPer100g';
+  const EX_HEADERS = 'name,category,muscleGroup,description,effectiveness';
+  const expectedHeaders = type === 'food' ? FOOD_HEADERS : EX_HEADERS;
+  const endpoint = type === 'food' ? '/food/import' : '/exercises/import';
+  const label = type === 'food' ? 'продуктів' : 'вправ';
+
+  async function handleFile(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    setError(''); setPreview(null);
+    const text = await f.text();
+    let parsed;
+    if (f.name.endsWith('.json')) {
+      try {
+        const arr = JSON.parse(text);
+        if (!Array.isArray(arr)) { setError("JSON має бути масивом об'єктів"); return; }
+        parsed = { error: null, data: arr };
+      } catch { setError('Невалідний JSON'); return; }
+    } else {
+      parsed = parseCSV(text);
+    }
+    if (parsed.error) { setError(parsed.error); return; }
+    setPreview(parsed.data);
+  }
+
+  async function handleImport() {
+    if (!preview?.length) return;
+    setImporting(true); setError('');
+    try {
+      const { data } = await api.post(endpoint, { records: preview });
+      setResult(data);
+      onImported();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Помилка імпорту');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: 560 }}>
+        <h2>Імпорт {label}</h2>
+        {result ? (
+          <>
+            <div style={{ padding: '16px', textAlign: 'center', background: '#dcfce7', borderRadius: 8, marginBottom: 16 }}>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#166534' }}>Готово!</div>
+              <div style={{ color: '#166534', marginTop: 6 }}>
+                Додано: <strong>{result.inserted}</strong> · Оновлено: <strong>{result.updated}</strong> · Всього: <strong>{result.total}</strong>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={onClose}>Закрити</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--bg)', borderRadius: 6, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Формат CSV (перший рядок — заголовки):<br />
+              <code style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{expectedHeaders}</code>
+            </div>
+            <div className="form-group">
+              <label>Файл (.csv або .json)</label>
+              <input type="file" accept=".csv,.json" onChange={handleFile}
+                     style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 6, width: '100%' }} />
+            </div>
+            {error && <div className="error-msg">{error}</div>}
+            {preview && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+                  Знайдено: <strong>{preview.length}</strong> записів. Перші 3:
+                </div>
+                <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 6 }}>
+                  <table style={{ fontSize: '0.75rem' }}>
+                    <thead>
+                      <tr>{Object.keys(preview[0] || {}).map((k) => <th key={k}>{k}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {preview.slice(0, 3).map((row, i) => (
+                        <tr key={i}>{Object.values(row).map((v, j) => <td key={j}>{String(v).slice(0, 25)}</td>)}</tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            <div className="modal-footer">
+              <button className="btn btn-outline" onClick={onClose}>Скасувати</button>
+              <button className="btn btn-primary" onClick={handleImport} disabled={!preview?.length || importing}>
+                {importing ? 'Імпортуємо...' : `Імпортувати ${preview?.length || 0} записів`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
